@@ -1,6 +1,7 @@
 package com.bank.transactionsystem.controller;
 
 import com.bank.transactionsystem.dto.DepositRequest;
+import com.bank.transactionsystem.dto.TransferRequest;
 import com.bank.transactionsystem.entity.TransactionRecord;
 import com.bank.transactionsystem.service.TransactionService;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +31,15 @@ public class TransactionController {
 	public TransactionRecord withdraw(@RequestBody DepositRequest request) {
 		return transactionService.withdraw(
 				request.getAccountId(),
+				request.getAmount(),
+				request.getTransactionId());
+	}
+
+	@PostMapping("/transfer")
+	public TransactionRecord transfer(@RequestBody TransferRequest request) {
+		return transactionService.transfer(
+				request.getSourceAccountId(),
+				request.getDestinationAccountId(),
 				request.getAmount(),
 				request.getTransactionId());
 	}
