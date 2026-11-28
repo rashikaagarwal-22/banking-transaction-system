@@ -19,6 +19,16 @@ public class GlobalExceptionHandler {
 		return buildErrorResponse(HttpStatus.BAD_REQUEST, ex);
 	}
 
+	@ExceptionHandler(DuplicateTransactionException.class)
+	public ResponseEntity<Map<String, String>> handleDuplicateTransaction(DuplicateTransactionException ex) {
+		return buildErrorResponse(HttpStatus.CONFLICT, ex);
+	}
+
+	@ExceptionHandler(InsufficientBalanceException.class)
+	public ResponseEntity<Map<String, String>> handleInsufficientBalance(InsufficientBalanceException ex) {
+		return buildErrorResponse(HttpStatus.BAD_REQUEST, ex);
+	}
+
 	private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, Exception ex) {
 		String message = ex.getMessage() != null ? ex.getMessage() : status.getReasonPhrase();
 		return ResponseEntity.status(status).body(Map.of("message", message));

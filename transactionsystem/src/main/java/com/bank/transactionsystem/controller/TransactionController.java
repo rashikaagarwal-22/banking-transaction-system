@@ -26,4 +26,12 @@ public class TransactionController {
 				request.getTransactionId());
 	}
 
+	@PostMapping("/withdraw")
+	public TransactionRecord withdraw(@RequestBody DepositRequest request) {
+		return transactionService.withdraw(
+				request.getAccountId(),
+				request.getAmount(),
+				request.getTransactionId());
+	}
+
 }

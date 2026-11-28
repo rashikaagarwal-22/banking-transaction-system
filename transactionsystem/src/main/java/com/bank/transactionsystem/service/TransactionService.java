@@ -3,6 +3,8 @@ package com.bank.transactionsystem.service;
 import com.bank.transactionsystem.entity.Account;
 import com.bank.transactionsystem.entity.TransactionRecord;
 import com.bank.transactionsystem.exception.AccountNotFoundException;
+import com.bank.transactionsystem.exception.DuplicateTransactionException;
+import com.bank.transactionsystem.exception.InsufficientBalanceException;
 import com.bank.transactionsystem.repository.AccountRepository;
 import com.bank.transactionsystem.repository.TransactionRepository;
 import java.math.BigDecimal;
@@ -29,33 +31,74 @@ public class TransactionService {
 	public TransactionRecord deposit(Long accountId, BigDecimal amount, String transactionId) {
 		log.info("Starting deposit transactionId={} accountId={} amount={}", transactionId, accountId, amount);
 
-		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-			throw new IllegalArgumentException("Deposit amount must be positive");
+		Account account = validateAndLockAccount(accountId, amount, transactionId);
+
+		account.setBalance(account.getBalance().add(amount));
+		accountRepository.save(account);
+
+		TransactionRecord savedRecord = saveTransactionRecord(
+				transactionId, "DEPOSIT", amount, null, accountId);
+		log.info("Completed deposit transactionId={} accountId={} newBalance={}",
+				transactionId, accountId, account.getBalance());
+
+		return savedRecord;
+	}
+
+	@Transactional
+	public TransactionRecord withdraw(Long accountId, BigDecimal amount, String transactionId) {
+		log.info("Starting withdrawal transactionId={} accountId={} amount={}", transactionId, accountId, amount);
+
+		Account account = validateAndLockAccount(accountId, amount, transactionId);
+
+		if (account.getBalance().compareTo(amount) < 0) {
+			throw new InsufficientBalanceException("Insufficient balance for account: " + accountId);
 		}
 
-		Account account = accountRepository.findById(accountId)
+		account.setBalance(account.getBalance().subtract(amount));
+		accountRepository.save(account);
+
+		TransactionRecord savedRecord = saveTransactionRecord(
+				transactionId, "WITHDRAWAL", amount, accountId, null);
+		log.info("Completed withdrawal transactionId={} accountId={} newBalance={}",
+				transactionId, accountId, account.getBalance());
+
+		return savedRecord;
+	}
+
+	private Account validateAndLockAccount(Long accountId, BigDecimal amount, String transactionId) {
+		if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new IllegalArgumentException("Transaction amount must be positive");
+		}
+
+		if (transactionRepository.existsByTransactionId(transactionId)) {
+			throw new DuplicateTransactionException("Duplicate transactionId: " + transactionId);
+		}
+
+		Account account = accountRepository.findByAccountIdForUpdate(accountId)
 				.orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
 
 		if (!"ACTIVE".equals(account.getStatus())) {
 			throw new IllegalArgumentException("Account is not ACTIVE: " + accountId);
 		}
 
-		account.setBalance(account.getBalance().add(amount));
-		accountRepository.save(account);
+		return account;
+	}
 
+	private TransactionRecord saveTransactionRecord(
+			String transactionId,
+			String type,
+			BigDecimal amount,
+			Long sourceAccountId,
+			Long destinationAccountId) {
 		TransactionRecord record = new TransactionRecord();
 		record.setTransactionId(transactionId);
-		record.setType("DEPOSIT");
+		record.setType(type);
 		record.setAmount(amount);
 		record.setStatus("SUCCESS");
-		record.setDestinationAccountId(accountId);
+		record.setSourceAccountId(sourceAccountId);
+		record.setDestinationAccountId(destinationAccountId);
 		record.setCreatedAt(LocalDateTime.now());
-
-		TransactionRecord savedRecord = transactionRepository.save(record);
-		log.info("Completed deposit transactionId={} accountId={} newBalance={}",
-				transactionId, accountId, account.getBalance());
-
-		return savedRecord;
+		return transactionRepository.save(record);
 	}
 
 }
